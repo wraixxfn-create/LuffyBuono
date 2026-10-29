@@ -9,7 +9,7 @@ disattivare la rotazione automatica e scaricare il file 3D.
 Apri un terminale nella cartella del progetto ed esegui:
 
 ```bash
-python3 -m http.server 8000
+py -m http.server 8000
 ```
 
 Visita <http://localhost:8000>. La pagina usa Three.js dal CDN jsDelivr;
