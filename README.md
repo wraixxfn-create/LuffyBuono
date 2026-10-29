@@ -11,7 +11,7 @@ in pausa la rotazione automatica; puoi riattivarla con l'apposito pulsante.
 Apri un terminale nella cartella del progetto ed esegui:
 
 ```bash
-python3 -m http.server 8000
+py -m http.server 8000
 ```
 
 Visita <http://localhost:8000>. Su Windows puoi usare `py -m http.server 8000`.
