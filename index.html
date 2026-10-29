@@ -9,7 +9,6 @@
     />
     <meta name="theme-color" content="#f6f4ee" />
     <title>Rufy — Studio 3D</title>
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <style>
       :root {
         color-scheme: light;
@@ -241,6 +240,8 @@
       }
 
       .drag-note svg {
+        width: 20px;
+        height: 20px;
         flex: 0 0 auto;
         color: var(--orange);
       }
@@ -429,9 +430,25 @@
           color 160ms ease;
       }
 
-      .control-button:hover {
+      .control-button:hover:not(:disabled) {
         border-color: #ffffff70;
         background: #ffffff16;
+      }
+
+      .control-button:disabled {
+        cursor: default;
+        opacity: 0.45;
+      }
+
+      .control-button--text {
+        display: inline-flex;
+        width: auto;
+        gap: 6px;
+        padding: 0 13px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 650;
+        letter-spacing: 0.03em;
       }
 
       .control-button--active {
@@ -440,7 +457,7 @@
         color: #211e1a;
       }
 
-      .control-button--active:hover {
+      .control-button--active:hover:not(:disabled) {
         border-color: #f38e61;
         background: #f38e61;
       }
@@ -461,7 +478,7 @@
       }
 
       .viewer-panel:fullscreen #model-canvas {
-        width: min(100vw, 110vh);
+        width: 100%;
         height: 100%;
       }
 
@@ -567,19 +584,28 @@
         }
       }
 
+      @media (max-width: 600px) {
+        .toolbar-tip {
+          display: none;
+        }
+
+        .viewer-toolbar {
+          justify-content: flex-end;
+        }
+      }
+
       @media (max-width: 390px) {
         .topbar-note {
           letter-spacing: 0.08em;
         }
 
-        .toolbar-tip {
-          max-width: 125px;
-          line-height: 1.4;
-        }
-
         .control-button {
           width: 36px;
           height: 36px;
+        }
+
+        .control-button--text {
+          width: auto;
         }
       }
 
@@ -597,8 +623,8 @@
     <script type="importmap">
       {
         "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+          "three": "./vendor/three/build/three.module.min.js",
+          "three/addons/": "./vendor/three/examples/jsm/"
         }
       }
     </script>
@@ -695,6 +721,22 @@
               <span class="toolbar-tip">TRASCINA PER ESPLORARE</span>
               <div class="toolbar-actions">
                 <button
+                  class="control-button control-button--text"
+                  id="face-button"
+                  type="button"
+                  aria-label="Inquadratura ravvicinata del volto di Rufy"
+                  aria-pressed="false"
+                  aria-controls="model-canvas"
+                  title="Avvicina il volto"
+                  disabled
+                >
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="9" r="3.25" stroke="currentColor" stroke-width="1.5" />
+                    <path d="M5.5 20a6.5 6.5 0 0 1 13 0M4 8V4h4m12 4V4h-4M4 16v4h2m14-4v4h-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  Volto
+                </button>
+                <button
                   class="control-button control-button--active"
                   id="rotate-button"
                   type="button"
@@ -746,6 +788,7 @@
       const loadingState = document.querySelector("#loading-state");
       const loadingMessage = document.querySelector("#loading-message");
       const progressFill = document.querySelector("#progress-fill");
+      const faceButton = document.querySelector("#face-button");
       const rotateButton = document.querySelector("#rotate-button");
       const resetButton = document.querySelector("#reset-button");
       const fullscreenButton = document.querySelector("#fullscreen-button");
@@ -772,7 +815,7 @@
       } catch (error) {
         console.error("Impossibile caricare il visualizzatore 3D:", error);
         showError(
-          "Per avviare il visualizzatore serve una connessione internet. Controlla la rete e ricarica la pagina.",
+          "Non riesco a caricare il visualizzatore. Verifica che i file del progetto siano disponibili e ricarica la pagina.",
         );
         throw error;
       }
@@ -797,32 +840,33 @@
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.2;
+      renderer.toneMappingExposure = 1.1;
       renderer.setClearColor(0x000000, 0);
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.055;
       controls.enablePan = false;
-      controls.minDistance = 1.35;
+      controls.minDistance = 0.3;
       controls.maxDistance = 7;
       controls.minPolarAngle = Math.PI * 0.12;
       controls.maxPolarAngle = Math.PI * 0.8;
       controls.autoRotate = !reducedMotion.matches;
       controls.autoRotateSpeed = 0.7;
 
-      scene.add(new THREE.HemisphereLight(0xfff0d8, 0x38424a, 2.05));
+      scene.add(new THREE.HemisphereLight(0xfff0d8, 0x38424a, 1.65));
 
-      const keyLight = new THREE.DirectionalLight(0xffe6ca, 3.15);
-      keyLight.position.set(-3.5, 6, 4.5);
+      // The character faces +X: light the face from the front, not from behind.
+      const keyLight = new THREE.DirectionalLight(0xffe6ca, 2.4);
+      keyLight.position.set(4, 6, 4);
       scene.add(keyLight);
 
-      const fillLight = new THREE.DirectionalLight(0xa6c7f5, 2.25);
-      fillLight.position.set(4, 3.1, 3);
+      const fillLight = new THREE.DirectionalLight(0xa6c7f5, 1.7);
+      fillLight.position.set(4, 3.1, -4);
       scene.add(fillLight);
 
-      const rimLight = new THREE.DirectionalLight(0xffcb99, 3.2);
-      rimLight.position.set(0, 4.5, -4);
+      const rimLight = new THREE.DirectionalLight(0xffcb99, 2);
+      rimLight.position.set(-4, 4.5, 0);
       scene.add(rimLight);
 
       const platform = new THREE.Mesh(
@@ -839,10 +883,13 @@
 
       let homePosition = null;
       let homeTarget = null;
+      let facePosition = null;
+      let faceTarget = null;
       let modelReady = false;
 
       function resizeRenderer() {
-        const { width, height } = panel.getBoundingClientRect();
+        // Use the canvas dimensions so the projection stays correct when resized.
+        const { width, height } = canvas.getBoundingClientRect();
         if (!width || !height) return;
 
         renderer.setSize(width, height, false);
@@ -859,6 +906,23 @@
             ? "Disattiva rotazione automatica"
             : "Attiva rotazione automatica",
         );
+      }
+
+      function updateFaceButton(isFocused) {
+        faceButton.classList.toggle("control-button--active", isFocused);
+        faceButton.setAttribute("aria-pressed", String(isFocused));
+        faceButton.title = isFocused ? "Torna alla figura intera" : "Avvicina il volto";
+      }
+
+      function moveCamera(position, target) {
+        // Clear any remaining drag inertia before setting an exact viewpoint.
+        const damping = controls.enableDamping;
+        controls.enableDamping = false;
+        controls.update();
+        camera.position.copy(position);
+        controls.target.copy(target);
+        controls.update();
+        controls.enableDamping = damping;
       }
 
       updateRotateButton(controls.autoRotate);
@@ -886,7 +950,8 @@
             const size = bounds.getSize(new THREE.Vector3());
             const center = bounds.getCenter(new THREE.Vector3());
 
-            model.position.y -= bounds.min.y - 0.1;
+            const lift = 0.1 - bounds.min.y;
+            model.position.y += lift;
             platform.scale.set(
               Math.max(size.x, size.z) * 0.82 / 0.78,
               1,
@@ -894,12 +959,12 @@
             );
             scene.add(model);
 
-            controls.target.set(center.x, center.y + 0.1, center.z);
+            controls.target.set(center.x, center.y + lift, center.z);
             const distance = Math.max(size.y * 2.25, 2.5);
             camera.position.set(
-              center.x + size.x * 1.2,
-              center.y + size.y * 0.2,
-              center.z + distance,
+              center.x + distance,
+              center.y + lift + size.y * 0.15,
+              center.z + size.z * 0.12,
             );
             camera.near = Math.max(size.y / 100, 0.01);
             camera.far = size.y * 30;
@@ -908,9 +973,19 @@
 
             homePosition = camera.position.clone();
             homeTarget = controls.target.clone();
+            // The head is slightly to one side of the bounds because of the raised arm.
+            faceTarget = new THREE.Vector3(
+              center.x + size.x * 0.18,
+              bounds.min.y + lift + size.y * 0.85,
+              center.z + size.z * 0.04,
+            );
+            facePosition = faceTarget.clone().add(
+              new THREE.Vector3(Math.max(size.y * 0.49, 0.75), -size.y * 0.02, size.z * 0.07),
+            );
             triangleCount.textContent = `${Math.round(triangles / 1000)}k triangoli`;
-            loadingState.hidden = true;
             modelReady = true;
+            faceButton.disabled = false;
+            loadingState.hidden = true;
           },
           (event) => {
             if (event.total > 0) {
@@ -931,6 +1006,19 @@
         showError("Questo browser non riesce ad avviare il visualizzatore 3D.");
       }
 
+      faceButton.addEventListener("click", () => {
+        if (!modelReady) return;
+        const isFocused = faceButton.getAttribute("aria-pressed") !== "true";
+        if (isFocused) {
+          controls.autoRotate = false;
+          updateRotateButton(false);
+          moveCamera(facePosition, faceTarget);
+        } else {
+          moveCamera(homePosition, homeTarget);
+        }
+        updateFaceButton(isFocused);
+      });
+
       rotateButton.addEventListener("click", () => {
         controls.autoRotate = !controls.autoRotate;
         updateRotateButton(controls.autoRotate);
@@ -938,9 +1026,8 @@
 
       resetButton.addEventListener("click", () => {
         if (!modelReady) return;
-        camera.position.copy(homePosition);
-        controls.target.copy(homeTarget);
-        controls.update();
+        moveCamera(homePosition, homeTarget);
+        updateFaceButton(false);
       });
 
       fullscreenButton.addEventListener("click", async () => {
@@ -976,7 +1063,9 @@
       });
 
       window.addEventListener("resize", resizeRenderer);
-      new ResizeObserver(resizeRenderer).observe(panel);
+      const resizeObserver = new ResizeObserver(resizeRenderer);
+      resizeObserver.observe(panel);
+      resizeObserver.observe(canvas);
       window.addEventListener("webglcontextlost", (event) => {
         event.preventDefault();
         showError("La visualizzazione 3D è stata interrotta. Ricarica la pagina per riprendere.");

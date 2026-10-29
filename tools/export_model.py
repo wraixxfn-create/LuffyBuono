@@ -5,7 +5,10 @@ import bpy
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_NAME = "Rufy · Mesh texturizzata"
-MAX_TEXTURE_SIZE = 2048
+# Keep the color map at full resolution so the eyes, smile and scar stay sharp
+# in close-up; normal and material maps can remain smaller for the web.
+MAX_COLOR_TEXTURE_SIZE = 4096
+MAX_DATA_TEXTURE_SIZE = 2048
 
 model = bpy.data.objects.get(MODEL_NAME)
 if model is None or model.type != "MESH":
@@ -16,7 +19,15 @@ for image in bpy.data.images:
         continue
 
     width, height = image.size
-    scale = min(MAX_TEXTURE_SIZE / width, MAX_TEXTURE_SIZE / height, 1)
+    if not width or not height:
+        raise RuntimeError(f"Image {image.name!r} has no pixels.")
+
+    max_size = (
+        MAX_COLOR_TEXTURE_SIZE
+        if image.colorspace_settings.name == "sRGB"
+        else MAX_DATA_TEXTURE_SIZE
+    )
+    scale = min(max_size / width, max_size / height, 1)
     if scale < 1:
         image.scale(round(width * scale), round(height * scale))
 
@@ -39,8 +50,10 @@ result = bpy.ops.export_scene.gltf(
     export_lights=False,
     export_animations=False,
     export_skins=False,
+    # Explicit tangents keep normal-map shading consistent across glTF viewers.
+    export_tangents=True,
     export_image_format="AUTO",
-    export_image_quality=90,
+    export_image_quality=98,
 )
 
 if "FINISHED" not in result:
