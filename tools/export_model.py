@@ -5,14 +5,30 @@ import bpy
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_NAME = "Rufy · Mesh texturizzata"
-# Keep the color map at full resolution so the eyes, smile and scar stay sharp
-# in close-up; normal and material maps can remain smaller for the web.
+FACE_NAME = "Rufy · Volto scolpito"
+HAIR_NAME = "Rufy · Ciocche sulla fronte"
+# Keep the color maps sharp in close-up; normal and material maps can remain
+# smaller for the web.
 MAX_COLOR_TEXTURE_SIZE = 4096
 MAX_DATA_TEXTURE_SIZE = 2048
 
 model = bpy.data.objects.get(MODEL_NAME)
 if model is None or model.type != "MESH":
     raise RuntimeError(f"Expected a mesh object named {MODEL_NAME!r} in the Blender file.")
+
+# The face and fringe are editable meshes parented to the original sculpture.
+# Export every mesh descendant so they remain part of the downloadable GLB.
+def descendants(parent):
+    yield parent
+    for child in parent.children:
+        yield from descendants(child)
+
+
+sculpture = [obj for obj in descendants(model) if obj.type == "MESH"]
+names = {obj.name for obj in sculpture}
+missing = {FACE_NAME, HAIR_NAME} - names
+if missing:
+    raise RuntimeError(f"Missing sculpture parts in the Blender file: {sorted(missing)!r}")
 
 for image in bpy.data.images:
     if image.source != "FILE":
@@ -35,7 +51,8 @@ decimate = model.modifiers.new(name="Web detail", type="DECIMATE")
 decimate.ratio = 0.5
 
 bpy.ops.object.select_all(action="DESELECT")
-model.select_set(True)
+for part in sculpture:
+    part.select_set(True)
 bpy.context.view_layer.objects.active = model
 
 destination = ROOT / "assets" / "rufy.glb"

@@ -57,12 +57,19 @@ class ModelAssetsTest(unittest.TestCase):
             position += segment_length
         self.fail("Dimensioni JPEG non trovate")
 
+    def node_and_primitive(self, name):
+        nodes = self.gltf["nodes"]
+        matches = [(index, node) for index, node in enumerate(nodes) if node.get("name") == name]
+        self.assertEqual(len(matches), 1, f"Oggetto mancante o duplicato: {name}")
+        index, node = matches[0]
+        self.assertIn("mesh", node)
+        primitive = self.gltf["meshes"][node["mesh"]]["primitives"][0]
+        return index, node, primitive
+
     def test_mesh_and_embedded_textures(self):
-        primitive = self.gltf["meshes"][0]["primitives"][0]
-        self.assertIn("POSITION", primitive["attributes"])
-        self.assertIn("NORMAL", primitive["attributes"])
-        self.assertIn("TANGENT", primitive["attributes"])
-        self.assertIn("TEXCOORD_0", primitive["attributes"])
+        _, _, primitive = self.node_and_primitive("Rufy · Mesh texturizzata")
+        for attribute in ("POSITION", "NORMAL", "TANGENT", "TEXCOORD_0"):
+            self.assertIn(attribute, primitive["attributes"])
         self.assertGreater(self.gltf["accessors"][primitive["indices"]]["count"], 0)
 
         material = self.gltf["materials"][primitive["material"]]
@@ -70,6 +77,31 @@ class ModelAssetsTest(unittest.TestCase):
         self.assertEqual(self.image_size(pbr["baseColorTexture"]["index"]), (4096, 4096))
         self.assertEqual(self.image_size(material["normalTexture"]["index"]), (2048, 2048))
         self.assertEqual(self.image_size(pbr["metallicRoughnessTexture"]["index"]), (2048, 2048))
+        self.assertLess(material["normalTexture"].get("scale", 1), 1)
+
+    def test_sculpted_face_and_fringe_are_exported(self):
+        _, model, _ = self.node_and_primitive("Rufy · Mesh texturizzata")
+        face_index, _, face = self.node_and_primitive("Rufy · Volto scolpito")
+        hair_index, _, hair = self.node_and_primitive("Rufy · Ciocche sulla fronte")
+        self.assertIn(face_index, model.get("children", []))
+        self.assertIn(hair_index, model.get("children", []))
+
+        for attribute in ("POSITION", "NORMAL", "TANGENT", "TEXCOORD_0"):
+            self.assertIn(attribute, face["attributes"])
+        positions = self.gltf["accessors"][face["attributes"]["POSITION"]]
+        self.assertGreater(positions["count"], 10_000)
+        # The new surface has real depth, rather than a flat image facing the camera.
+        self.assertGreater(positions["max"][0] - positions["min"][0], 0.02)
+        self.assertGreater(self.gltf["accessors"][face["indices"]]["count"], 0)
+        self.assertIn("NORMAL", hair["attributes"])
+        self.assertGreater(self.gltf["accessors"][hair["indices"]]["count"], 0)
+
+        material = self.gltf["materials"][face["material"]]
+        pbr = material["pbrMetallicRoughness"]
+        self.assertGreaterEqual(pbr.get("roughnessFactor", 1), 0.65)
+        self.assertEqual(material.get("alphaMode", "OPAQUE"), "OPAQUE")
+        self.assertFalse(material.get("doubleSided", False))
+        self.assertEqual(self.image_size(pbr["baseColorTexture"]["index"]), (1600, 1018))
 
     def test_viewer_imports_are_local(self):
         html = (ROOT / "index.html").read_text(encoding="utf-8")
